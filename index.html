@@ -3,7 +3,8 @@
 <title>FocusFlow — Pomodoro & Focus Tracker</title>
 <style>
 body{font-family:system-ui,sans-serif;background:#18181B;color:#FAFAF9;margin:0;display:flex;justify-content:center}
-main{max-width:440px;width:100%;padding:24px;text-align:center}
+main{max-width:460px;width:100%;padding:28px;text-align:center}h1{font-weight:700;letter-spacing:-.5px}button{transition:background .2s,transform .1s}button:active{transform:scale(.96)}
+#ring{position:relative;width:260px;height:260px;margin:18px auto}#ring svg{transform:rotate(-90deg)}#ring #time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;font-size:64px}
 .modes button,.ctrl button{background:#2a2a30;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:4px;cursor:pointer;font-size:15px}
 .modes button.on{background:#2A78D6}.ctrl button.primary{background:#008300}
 #time{font-size:84px;font-variant-numeric:tabular-nums;margin:20px 0}
@@ -15,40 +16,51 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 </style></head><body><main>
 <h1>FocusFlow</h1>
 <div class="modes"><button data-m="focus" class="on">Focus</button><button data-m="short">Short break</button><button data-m="long">Long break</button></div>
-<div id="time">25:00</div>
+<input id="task" placeholder="What are you working on?" style="width:90%;padding:8px;margin-top:14px;border-radius:8px;border:0;background:#26262b;color:#fff">
+<div id="ring"><svg width="260" height="260"><circle cx="130" cy="130" r="118" stroke="#2a2a30" stroke-width="10" fill="none"/><circle id="prog" cx="130" cy="130" r="118" stroke="#2A78D6" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="741.4" stroke-dashoffset="0"/></svg><div id="time">25:00</div></div>
 <div class="ctrl"><button id="start" class="primary">Start</button><button id="reset">Reset</button><button id="skip">Skip</button></div>
 <div class="stats">
 <div class="card"><b id="today">0</b>sessions today</div>
 <div class="card"><b id="mins">0</b>focus min today</div>
 <div class="card"><b id="streak">0</b>day streak</div></div>
 <div id="week"></div>
+<div id="tasks" style="text-align:left;margin-top:16px;font-size:14px"></div>
+<p style="font-size:12px;opacity:.6">Space = start/pause · R = reset · S = skip</p>
 <details style="margin-top:20px"><summary>Settings</summary>
 <label>Focus <input id="sFocus" type="number" min="1"> min</label>
 <label>Short break <input id="sShort" type="number" min="1"> min</label>
 <label>Long break <input id="sLong" type="number" min="1"> min</label>
 <label>Daily goal <input id="sGoal" type="number" min="1"> sessions</label>
+<label><input id="sAuto" type="checkbox" style="width:auto"> Auto-start next session</label>
+<label><input id="sSound" type="checkbox" style="width:auto"> Chime sound</label>
 <button id="export">Export CSV</button></details>
 </main>
 <script>
 const K='focusflow';const st=JSON.parse(localStorage.getItem(K)||'{}');
 st.cfg=st.cfg||{focus:25,short:5,long:15,goal:4};st.log=st.log||{};// date->{n,mins}
 const save=()=>localStorage.setItem(K,JSON.stringify(st));
-const day=d=>d.toISOString().slice(0,10);
+const day=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+if(st.cfg.auto===undefined)st.cfg.auto=false;if(st.cfg.sound===undefined)st.cfg.sound=true;
+function chime(){if(!st.cfg.sound)return;try{const c=new(window.AudioContext||window.webkitAudioContext)();[0,.25,.5].forEach((t,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=[660,880,990][i];g.gain.setValueAtTime(.25,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+t+.4);o.connect(g).connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+.45)})}catch(e){}}
 let mode='focus',left=st.cfg.focus*60,timer=null,count=0;
 const $=id=>document.getElementById(id);
-function draw(){$('time').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');document.title=$('time').textContent+' · FocusFlow'}
+function draw(){$('time').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');document.title=$('time').textContent+' · FocusFlow';const p=$('prog');p.style.strokeDashoffset=741.4*(1-left/(st.cfg[mode]*60));p.style.stroke=mode=='focus'?'#2A78D6':'#008300'}
 function setMode(m){mode=m;stop();left=st.cfg[m]*60;document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m==m));draw()}
 function stop(){clearInterval(timer);timer=null;$('start').textContent='Start'}
 function streak(){let s=0,d=new Date();if(!st.log[day(d)])d.setDate(d.getDate()-1);while(st.log[day(d)]){s++;d.setDate(d.getDate()-1)}return s}
 function stats(){const t=st.log[day(new Date())]||{n:0,mins:0};$('today').textContent=t.n+'/'+st.cfg.goal;$('mins').textContent=t.mins;$('streak').textContent=streak();
 const w=$('week');w.innerHTML='';const max=Math.max(1,...Object.values(st.log).map(x=>x.n));
+const tt=(st.log[day(new Date())]||{}).tasks||{};$('tasks').innerHTML=Object.keys(tt).length?'<b>Today by task</b><br>'+Object.entries(tt).map(([k,v])=>k.replace(/[<>&]/g,'')+': '+v+' min').join('<br>'):'';
 for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const n=(st.log[day(d)]||{n:0}).n;const e=document.createElement('div');e.style.height=(8+80*n/max)+'px';e.textContent=n;e.title=day(d);w.appendChild(e)}}
-function done(){stop();try{new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play()}catch(e){}
-if(mode=='focus'){const k=day(new Date());const t=st.log[k]||{n:0,mins:0};t.n++;t.mins+=st.cfg.focus;st.log[k]=t;save();stats();count++;setMode(count%4==0?'long':'short')}else setMode('focus');
+function done(skipped){stop();if(!skipped)chime();
+if(mode=='focus'){if(!skipped){const k=day(new Date());const t=st.log[k]||{n:0,mins:0};t.n++;t.mins+=st.cfg.focus;t.tasks=t.tasks||{};const tk=$('task').value.trim()||'(untitled)';t.tasks[tk]=(t.tasks[tk]||0)+st.cfg.focus;st.log[k]=t;save();stats();count++}setMode(count&&count%4==0&&!skipped?'long':'short')}else setMode('focus');if(st.cfg.auto&&!skipped)$('start').click();
 if(window.Notification&&Notification.permission=='granted')new Notification('FocusFlow',{body:mode=='focus'?'Back to focus!':'Time for a break.'})}
 $('start').onclick=()=>{if(timer)return stop();if(window.Notification&&Notification.permission=='default')Notification.requestPermission();
 const end=Date.now()+left*1000;$('start').textContent='Pause';timer=setInterval(()=>{left=Math.max(0,Math.round((end-Date.now())/1000));draw();if(!left)done()},250)};
-$('reset').onclick=()=>setMode(mode);$('skip').onclick=()=>{left=0;done()};
+$('reset').onclick=()=>setMode(mode);$('skip').onclick=()=>done(true);
+document.addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.code=='Space'){e.preventDefault();$('start').click()}if(e.key=='r')$('reset').click();if(e.key=='s')$('skip').click()});
+['sAuto','sSound'].forEach(id=>{const k=id=='sAuto'?'auto':'sound';$(id).checked=st.cfg[k];$(id).onchange=e=>{st.cfg[k]=e.target.checked;save()}});
+$('task').value=st.task||'';$('task').oninput=e=>{st.task=e.target.value;save()};
 document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
 [['sFocus','focus'],['sShort','short'],['sLong','long'],['sGoal','goal']].forEach(([id,k])=>{$(id).value=st.cfg[k];$(id).onchange=e=>{st.cfg[k]=Math.max(1,+e.target.value||1);save();stats();if(!timer&&k==mode)setMode(mode)}});
 $('export').onclick=()=>{const csv='date,sessions,focus_minutes\n'+Object.keys(st.log).sort().map(k=>k+','+st.log[k].n+','+st.log[k].mins).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='focusflow.csv';a.click()};
