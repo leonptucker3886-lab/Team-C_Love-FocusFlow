@@ -6,7 +6,7 @@ body{font-family:system-ui,sans-serif;background:#18181B;color:#FAFAF9;margin:0;
 main{max-width:460px;width:100%;padding:28px;text-align:center}h1{font-weight:700;letter-spacing:-.5px}button{transition:background .2s,transform .1s}button:active{transform:scale(.96)}
 #ring{position:relative;width:260px;height:260px;margin:18px auto}#ring svg{transform:rotate(-90deg)}#ring #time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;font-size:64px}
 .modes button,.ctrl button{background:#2a2a30;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:4px;cursor:pointer;font-size:15px}
-.modes button.on{background:#2A78D6}.ctrl button.primary{background:#008300}
+.modes button.on,.rng button.on{background:#2A78D6}.rng button{background:#2a2a30;color:#fff;border:0;border-radius:6px;padding:4px 8px;margin:2px;cursor:pointer;font-size:12px}.ctrl button.primary{background:#008300}
 #time{font-size:84px;font-variant-numeric:tabular-nums;margin:20px 0}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:24px}
 .card{background:#26262b;border-radius:10px;padding:12px}.card b{display:block;font-size:24px}
@@ -16,7 +16,7 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 </style></head><body><main>
 <h1>FocusFlow</h1>
 <div class="modes"><button data-m="focus" class="on">Focus</button><button data-m="short">Short break</button><button data-m="long">Long break</button></div>
-<input id="task" placeholder="What are you working on?" style="width:90%;padding:8px;margin-top:14px;border-radius:8px;border:0;background:#26262b;color:#fff">
+<input id="task" list="projList" placeholder="Project / task (pick or type new)" style="width:90%;padding:8px;margin-top:14px;border-radius:8px;border:0;background:#26262b;color:#fff">
 <div id="ring"><svg width="260" height="260"><circle cx="130" cy="130" r="118" stroke="#2a2a30" stroke-width="10" fill="none"/><circle id="prog" cx="130" cy="130" r="118" stroke="#2A78D6" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="741.4" stroke-dashoffset="0"/></svg><div id="time">25:00</div></div>
 <div class="ctrl"><button id="start" class="primary">Start</button><button id="reset">Reset</button><button id="skip">Skip</button></div>
 <div class="stats">
@@ -24,6 +24,8 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 <div class="card"><b id="mins">0</b>focus min today</div>
 <div class="card"><b id="streak">0</b>day streak</div></div>
 <div id="week"></div>
+<datalist id="projList"></datalist>
+<section id="proj" style="text-align:left;margin-top:20px;background:#26262b;border-radius:10px;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b>Time by project</b><span class="rng"><button data-r="7" class="on">Week</button><button data-r="30">Month</button><button data-r="0">All</button></span></div><div id="projBars"></div><div id="projTotal" style="font-size:12px;opacity:.7;margin-top:6px"></div></section>
 <div id="tasks" style="text-align:left;margin-top:16px;font-size:14px"></div>
 <p style="font-size:12px;opacity:.6">Space = start/pause · R = reset · S = skip</p>
 <details style="margin-top:20px"><summary>Settings</summary>
@@ -33,7 +35,7 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 <label>Daily goal <input id="sGoal" type="number" min="1"> sessions</label>
 <label><input id="sAuto" type="checkbox" style="width:auto"> Auto-start next session</label>
 <label><input id="sSound" type="checkbox" style="width:auto"> Chime sound</label>
-<button id="export">Export CSV</button></details>
+<button id="export">Export CSV</button> <button id="exportP">Export projects CSV</button></details>
 </main>
 <script>
 const K='focusflow';const st=JSON.parse(localStorage.getItem(K)||'{}');
@@ -64,5 +66,15 @@ $('task').value=st.task||'';$('task').oninput=e=>{st.task=e.target.value;save()}
 document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
 [['sFocus','focus'],['sShort','short'],['sLong','long'],['sGoal','goal']].forEach(([id,k])=>{$(id).value=st.cfg[k];$(id).onchange=e=>{st.cfg[k]=Math.max(1,+e.target.value||1);save();stats();if(!timer&&k==mode)setMode(mode)}});
 $('export').onclick=()=>{const csv='date,sessions,focus_minutes\n'+Object.keys(st.log).sort().map(k=>k+','+st.log[k].n+','+st.log[k].mins).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='focusflow.csv';a.click()};
+
+let range=7;const esc=s=>s.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+function projTotals(r){const out={};const cut=new Date();cut.setHours(0,0,0,0);cut.setDate(cut.getDate()-(r-1));Object.entries(st.log).forEach(([k,v])=>{if(r&&new Date(k+'T00:00')<cut)return;Object.entries(v.tasks||{}).forEach(([t,m])=>out[t]=(out[t]||0)+m)});return out}
+function projDraw(){const t=projTotals(range),e=Object.entries(t).sort((a,b)=>b[1]-a[1]),max=Math.max(1,...e.map(x=>x[1])),tot=e.reduce((s,x)=>s+x[1],0);const cols=['#2A78D6','#008300','#c2410c','#7c3aed','#0891b2','#be185d'];
+$('projBars').innerHTML=e.length?e.map(([k,m],i)=>'<div style="margin:6px 0;font-size:13px"><div style="display:flex;justify-content:space-between"><span>'+esc(k)+'</span><span>'+(m>=60?Math.floor(m/60)+'h ':'')+(m%60)+'m · '+Math.round(100*m/tot)+'%</span></div><div style="height:8px;background:#18181B;border-radius:4px"><div style="height:8px;border-radius:4px;width:'+(100*m/max)+'%;background:'+cols[i%6]+'"></div></div></div>').join(''):'<p style="font-size:13px;opacity:.7">No sessions in this range yet. Name a project above and finish a focus session.</p>';
+$('projTotal').textContent=e.length?e.length+' project(s), '+Math.floor(tot/60)+'h '+(tot%60)+'m total':'';
+$('projList').innerHTML=Object.keys(projTotals(0)).map(k=>'<option value="'+esc(k)+'">').join('')}
+document.querySelectorAll('#proj button').forEach(b=>b.onclick=()=>{range=+b.dataset.r;document.querySelectorAll('#proj button').forEach(x=>x.classList.toggle('on',x==b));projDraw()});
+$('exportP').onclick=()=>{const rows=[];Object.keys(st.log).sort().forEach(k=>Object.entries(st.log[k].tasks||{}).forEach(([t,m])=>rows.push(k+',"'+t.replace(/"/g,'""')+'",'+m)));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['date,project,minutes\n'+rows.join('\n')],{type:'text/csv'}));a.download='focusflow-projects.csv';a.click()};
+const _stats=stats;stats=function(){_stats();projDraw()};
 draw();stats();
 </script></body></html>
