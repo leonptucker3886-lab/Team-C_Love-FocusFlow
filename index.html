@@ -22,7 +22,10 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 <div class="stats">
 <div class="card"><b id="today">0</b>sessions today</div>
 <div class="card"><b id="mins">0</b>focus min today</div>
-<div class="card"><b id="streak">0</b>day streak</div></div>
+<div class="card"><b id="streak">0</b>day streak</div>
+<div class="card"><b id="gstreak">0</b>goal streak (best <span id="best">0</span>)</div></div>
+<div style="background:#26262b;border-radius:6px;height:10px;margin:10px 0;overflow:hidden"><div id="goalBar" style="height:100%;width:0;background:#008300;transition:width .4s"></div></div><div id="goalMsg" style="font-size:13px;opacity:.8"></div>
+<div id="cal" style="display:grid;grid-template-columns:repeat(14,1fr);gap:3px;margin:10px 0" title="Last 28 days: green = goal met"></div>
 <div id="week"></div>
 <datalist id="projList"></datalist>
 <section id="proj" style="text-align:left;margin-top:20px;background:#26262b;border-radius:10px;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b>Time by project</b><span class="rng"><button data-r="7" class="on">Week</button><button data-r="30">Month</button><button data-r="0">All</button></span></div><div id="projBars"></div><div id="projTotal" style="font-size:12px;opacity:.7;margin-top:6px"></div></section>
@@ -77,4 +80,9 @@ document.querySelectorAll('#proj button').forEach(b=>b.onclick=()=>{range=+b.dat
 $('exportP').onclick=()=>{const rows=[];Object.keys(st.log).sort().forEach(k=>Object.entries(st.log[k].tasks||{}).forEach(([t,m])=>rows.push(k+',"'+t.replace(/"/g,'""')+'",'+m)));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['date,project,minutes\n'+rows.join('\n')],{type:'text/csv'}));a.download='focusflow-projects.csv';a.click()};
 const _stats=stats;stats=function(){_stats();projDraw()};
 draw();stats();
+function goalOk(k){return (st.log[k]||{n:0}).n>=st.cfg.goal}
+function gStreak(){let s=0,d=new Date();if(!goalOk(day(d)))d.setDate(d.getDate()-1);while(goalOk(day(d))){s++;d.setDate(d.getDate()-1)}return s}
+function bestStreak(){const ks=Object.keys(st.log).filter(goalOk).sort();let b=0,c=0,prev=null;ks.forEach(k=>{const t=new Date(k+'T00:00');c=(prev&&(t-prev)/864e5<1.5)?c+1:1;b=Math.max(b,c);prev=t});return b}
+function goalDraw(){const t=(st.log[day(new Date())]||{n:0}).n,g=st.cfg.goal;$('goalBar').style.width=Math.min(100,100*t/g)+'%';$('goalMsg').textContent=t>=g?'Daily goal reached \u2714':(g-t)+' session'+(g-t>1?'s':'')+' to your daily goal';$('gstreak').textContent=gStreak();$('best').textContent=Math.max(bestStreak(),gStreak());const c=$('cal');c.innerHTML='';for(let i=27;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=day(d),n=(st.log[k]||{n:0}).n,e=document.createElement('div');e.style.cssText='height:14px;border-radius:3px;background:'+(n>=g?'#008300':n?'#2A78D6':'#2a2a30');e.title=k+': '+n+'/'+g;c.appendChild(e)}}
+const _stats2=stats;stats=function(){_stats2();goalDraw()};stats();
 </script></body></html>
