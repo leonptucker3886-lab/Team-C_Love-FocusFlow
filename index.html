@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FocusFlow — Pomodoro & Focus Tracker</title>
+<title>FocusFlow: Pomodoro Timer &amp; Focus Tracker</title>
+<meta name="description" content="Pomodoro timer with daily goals, streaks, project time tracking and CSV export. No account, no ads. Your data stays in your browser.">
+<meta property="og:title" content="FocusFlow: Pomodoro Timer &amp; Focus Tracker"><meta property="og:description" content="Focus sessions, streaks and stats in one simple timer."><meta property="og:type" content="website"><meta name="theme-color" content="#18181B">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
 <style>
 body{font-family:system-ui,sans-serif;background:#18181B;color:#FAFAF9;margin:0;display:flex;justify-content:center}
 main{max-width:460px;width:100%;padding:28px;text-align:center}h1{font-weight:700;letter-spacing:-.5px}button{transition:background .2s,transform .1s}button:active{transform:scale(.96)}
@@ -8,11 +11,13 @@ main{max-width:460px;width:100%;padding:28px;text-align:center}h1{font-weight:70
 .modes button,.ctrl button{background:#2a2a30;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:4px;cursor:pointer;font-size:15px}
 .modes button.on,.rng button.on{background:#2A78D6}.rng button{background:#2a2a30;color:#fff;border:0;border-radius:6px;padding:4px 8px;margin:2px;cursor:pointer;font-size:12px}.ctrl button.primary{background:#008300}
 #time{font-size:84px;font-variant-numeric:tabular-nums;margin:20px 0}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:24px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:24px}
 .card{background:#26262b;border-radius:10px;padding:12px}.card b{display:block;font-size:24px}
 label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 #week{display:flex;justify-content:space-between;align-items:flex-end;height:90px;margin-top:20px}
 #week div{width:10%;background:#2A78D6;border-radius:4px 4px 0 0;font-size:10px}
+@media(max-width:400px){#ring{transform:scale(.85);margin:0 auto}main{padding:16px}}
+footer{font-size:12px;opacity:.6;margin-top:18px}
 </style></head><body><main>
 <h1>FocusFlow</h1>
 <div class="modes"><button data-m="focus" class="on">Focus</button><button data-m="short">Short break</button><button data-m="long">Long break</button></div>
@@ -38,7 +43,8 @@ label{display:block;margin:6px 0;font-size:14px}input{width:60px}
 <label>Daily goal <input id="sGoal" type="number" min="1"> sessions</label>
 <label><input id="sAuto" type="checkbox" style="width:auto"> Auto-start next session</label>
 <label><input id="sSound" type="checkbox" style="width:auto"> Chime sound</label>
-<button id="export">Export CSV</button> <button id="exportP">Export projects CSV</button></details>
+<button id="export">Export CSV</button> <button id="exportP">Export projects CSV</button><br><br><button id="bkE">Export backup</button> <button id="bkI">Import backup</button><input type="file" id="bkF" accept=".json" hidden> <button id="wipe">Reset all data</button></details>
+<footer>FocusFlow · $4.99 one-time · No account, no ads. Your sessions are saved only in this browser.</footer>
 </main>
 <script>
 const K='focusflow';const st=JSON.parse(localStorage.getItem(K)||'{}');
@@ -84,5 +90,9 @@ function goalOk(k){return (st.log[k]||{n:0}).n>=st.cfg.goal}
 function gStreak(){let s=0,d=new Date();if(!goalOk(day(d)))d.setDate(d.getDate()-1);while(goalOk(day(d))){s++;d.setDate(d.getDate()-1)}return s}
 function bestStreak(){const ks=Object.keys(st.log).filter(goalOk).sort();let b=0,c=0,prev=null;ks.forEach(k=>{const t=new Date(k+'T00:00');c=(prev&&(t-prev)/864e5<1.5)?c+1:1;b=Math.max(b,c);prev=t});return b}
 function goalDraw(){const t=(st.log[day(new Date())]||{n:0}).n,g=st.cfg.goal;$('goalBar').style.width=Math.min(100,100*t/g)+'%';$('goalMsg').textContent=t>=g?'Daily goal reached \u2714':(g-t)+' session'+(g-t>1?'s':'')+' to your daily goal';$('gstreak').textContent=gStreak();$('best').textContent=Math.max(bestStreak(),gStreak());const c=$('cal');c.innerHTML='';for(let i=27;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=day(d),n=(st.log[k]||{n:0}).n,e=document.createElement('div');e.style.cssText='height:14px;border-radius:3px;background:'+(n>=g?'#008300':n?'#2A78D6':'#2a2a30');e.title=k+': '+n+'/'+g;c.appendChild(e)}}
+$('bkE').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(st,null,2)],{type:'application/json'}));a.download='focusflow-backup-'+day(new Date())+'.json';a.click()};
+$('bkI').onclick=()=>$('bkF').click();
+$('bkF').onchange=e=>{const fl=e.target.files[0];if(!fl)return;fl.text().then(t=>{try{const d=JSON.parse(t);if(!d.cfg||!d.log)throw 0;if(confirm('Replace your current data with this backup?')){localStorage.setItem(K,JSON.stringify(d));location.reload()}}catch(x){alert('That file is not a FocusFlow backup.')}})};
+$('wipe').onclick=()=>{if(confirm('Delete all sessions and settings?')){localStorage.removeItem(K);location.reload()}};
 const _stats2=stats;stats=function(){_stats2();goalDraw()};stats();
 </script></body></html>
